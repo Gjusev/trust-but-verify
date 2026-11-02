@@ -75,7 +75,7 @@ def main():
 
     arm_names = list(ARMS) if args.arm == "all" else [args.arm]
     task_list = tasks_mod.load_tasks(args.limit, source=args.tasks, offset=args.offset)
-    print(f"verify-harness: {len(task_list)} tasks (offset {args.offset}), arms={arm_names}, "
+    print(f"trust-but-verify: {len(task_list)} tasks (offset {args.offset}), arms={arm_names}, "
           f"mock={args.mock}, solver={args.solver_model}, reviewer={args.reviewer_model}")
 
     all_rows = []
