@@ -123,6 +123,7 @@ Source paper:
 ```bibtex
 @misc{rethinkingverification2026,
   title         = {Rethinking Verification in Agent Harnesses},
+  author        = {Zhang, Zhengxin and Zhu, Erkang and Lin, Yin and Cardie, Claire and Ding, Bolin and Zhou, Jingren},
   year          = {2026},
   eprint        = {2610.34577},
   archivePrefix = {arXiv},
