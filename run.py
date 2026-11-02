@@ -68,12 +68,15 @@ def main():
     ap.add_argument("--solver-model", default="glm-4.5-flash")
     ap.add_argument("--reviewer-model", default="glm-4.5-flash")
     ap.add_argument("--tasks", default="humaneval", choices=["humaneval", "mini"])
+    ap.add_argument("--offset", type=int, default=0,
+                    help="skip this many tasks (numeric id order) before selecting")
+    ap.add_argument("--csv", default=None, help="alternate results.csv path")
     args = ap.parse_args()
 
     arm_names = list(ARMS) if args.arm == "all" else [args.arm]
-    task_list = tasks_mod.load_tasks(args.limit, source=args.tasks)
-    print(f"verify-harness: {len(task_list)} tasks, arms={arm_names}, mock={args.mock}, "
-          f"solver={args.solver_model}, reviewer={args.reviewer_model}")
+    task_list = tasks_mod.load_tasks(args.limit, source=args.tasks, offset=args.offset)
+    print(f"verify-harness: {len(task_list)} tasks (offset {args.offset}), arms={arm_names}, "
+          f"mock={args.mock}, solver={args.solver_model}, reviewer={args.reviewer_model}")
 
     all_rows = []
     for arm_name in arm_names:
@@ -84,7 +87,10 @@ def main():
                 print(f"budget guard: estimated {cost:.4f} USD, stopping early")
                 break
 
-    csv_path = report.write_csv(all_rows)
+    csv_path = report.write_csv(
+        all_rows,
+        path=args.csv or (os.path.join(report.RESULTS_DIR, "results_mock.csv") if args.mock else None),
+    )
     stats = report.aggregate(all_rows)
     print("\n" + report.table_md(stats) + "\n")
     if args.mock:
@@ -95,10 +101,13 @@ def main():
               f"(cap {BUDGET_USD} USD)")
     print(f"wrote {csv_path}")
 
-    if args.arm == "all" and len(all_rows) == len(ARMS) * len(task_list):
+    if args.arm == "all" and not args.mock and len(all_rows) == len(ARMS) * len(task_list):
         meta = {
             "mock": args.mock, "n_tasks": len(task_list),
             "solver_model": args.solver_model, "reviewer_model": args.reviewer_model,
+            "title": f"Primary run: {len(task_list)} tasks at offset {args.offset}",
+            "note": (f"Tasks: HumanEval sorted by numeric task id, {len(task_list)} tasks "
+                     f"starting at offset {args.offset} (offset 0 is HumanEval/0 up)."),
         }
         md = report.results_md(all_rows, stats, meta)
         root = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))

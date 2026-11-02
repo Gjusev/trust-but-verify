@@ -54,11 +54,11 @@ def _download():
     os.remove(tmp)
 
 
-def load_tasks(limit, source="humaneval"):
+def load_tasks(limit, source="humaneval", offset=0):
     """Return `limit` tasks, deterministically ordered.
 
-    source="humaneval": first `limit` HumanEval tasks by numeric task id
-    (cached in data/, downloaded on first use, mini fallback set on failure).
+    source="humaneval": HumanEval tasks sorted by numeric task id, starting at
+    `offset` (cached in data/, downloaded on first use, mini fallback on failure).
     source="mini": bundled fallback set.
     """
     if source == "mini":
@@ -71,7 +71,7 @@ def load_tasks(limit, source="humaneval"):
     with open(DATA_PATH, encoding="utf-8") as f:
         rows = [json.loads(line) for line in f if line.strip()]
     rows.sort(key=lambda r: int(r["task_id"].split("/")[-1]))
-    return rows[:limit]
+    return rows[offset:offset + limit]
 
 
 def build_program(task, completion):

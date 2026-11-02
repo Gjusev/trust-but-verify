@@ -83,3 +83,26 @@ Non-obvious choices, in the order they came up.
   machine is not used.
 - hermes_run.log (a failed proxy start attempt from before this project) was
   deleted as unrelated debris.
+
+## The two measured runs
+
+- The spec-default run (first 20 HumanEval tasks) saturated: glm-4.5-flash
+  solved all 20 first-try, so every arm scored 100 percent and verification
+  deltas were structurally zero. That result is reported as measured, not
+  hidden.
+- A verification-design comparison needs headroom below the ceiling, so a
+  second measured run used the last 20 tasks by numeric id (HumanEval/144 to
+  /163, run.py --offset 144). Selection procedure: one none-arm-only probe
+  run on that subset showed 85 percent, then the full four-arm run was
+  executed there. No other subsets were shopped.
+- The first-20 run wrote its per-task rows only to results/results.csv, which
+  a later probe overwrote. The full per-task log (run_output.txt: task, arm,
+  verdict, calls, tokens) was used to reconstruct the identical rows; that is
+  the same measured data, not a rerun. Both raw logs are kept in the repo.
+- Measured totals across both runs: about 97k tokens, estimated 0.05 USD
+  against the 2 USD cap.
+- Direction observed on the harder subset: reviewer +5 points at 3.56x token
+  cost, gate +5 at 1.50x, selfcheck +5 at 2.73x. The paper's gate cost range
+  (1.5x to 1.8x) matches the gate multiplier here; its reviewer cost range
+  (1.13x to 1.25x) does not, because our base arm is a single short call and
+  every verification turn pays full context again.

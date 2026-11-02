@@ -39,7 +39,8 @@ python run.py --arm all --solver-model MODEL --reviewer-model MODEL
 
 The API key is read from `ZAI_API_KEY` and the endpoint from `ZAI_BASE_URL`
 (default `https://api.z.ai/api/paas/v4`). Measured output lands in
-`results/results.csv` and `RESULTS.md`. Tests: `pytest`.
+`results/results.csv` and `RESULTS.md`. Add `--offset 144` to run the harder
+last-20 subset instead of the first 20. Tests: `pytest`.
 
 ## Differences from the paper
 
@@ -66,9 +67,19 @@ src/tasks.py        HumanEval loading, fallback set, sandboxed test runner
 src/arms.py         the four verification arms
 src/report.py       aggregation, results.csv, RESULTS.md
 tests/              pytest suite (no network needed)
-data/HumanEval.jsonl  cached task set (MIT licensed, openai/human-eval)
-results/results.csv   per-task, per-arm measurements
+data/HumanEval.jsonl    cached task set (MIT licensed, openai/human-eval)
+results/results.csv     per-task measurements, spec-default run (first 20 tasks)
+results/results_first20.csv   same data as results.csv
+results/results_hard20.csv    per-task measurements, last 20 tasks
+results/results_mock.csv      written by --mock runs, fake numbers by design
+run_output.txt      raw console log of the first-20 run
+run_output_hard.txt raw console log of the last-20 run
 ```
+
+RESULTS.md reports two measured runs: the spec-default first 20 tasks (which
+saturate at 100 percent for this model, so all verification deltas are zero)
+and the last 20 tasks, where the base arm sits at 85 percent and the deltas
+have room to appear.
 
 ## License
 

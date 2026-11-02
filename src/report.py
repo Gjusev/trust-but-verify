@@ -75,61 +75,71 @@ def estimate_usd(rows):
     return tin * price[0] + tout * price[1], tin * 1e6 + tout * 1e6
 
 
-def results_md(rows, stats, meta):
-    """Build the full RESULTS.md content from measured rows."""
-    cost, total_tokens = estimate_usd(rows)
+def results_md(rows, stats, meta, extra_blocks=None):
+    """Build RESULTS.md content. `rows`/`stats` are the primary run; extra_blocks
+    is an optional list of (title, note, extra_rows, extra_stats) for additional
+    measured subsets."""
+    all_rows = list(rows) + [r for _, _, rs, _ in (extra_blocks or []) for r in rs]
+    cost, total_tokens = estimate_usd(all_rows)
     date = datetime.date.today().isoformat()
     if meta.get("mock"):
         banner = (
             "STATUS: MOCK RUN. All numbers below come from the deterministic fake\n"
             "solver and fake test verdicts. They validate plumbing only and are NOT\n"
-            "measurements of any model. Real tables: PENDING.\n\n"
+            "measurements of any model. Real tables: PENDING.\n"
         )
         model_line = "model: mock (no API calls)"
     else:
         banner = (
-            "STATUS: MEASURED. Numbers below come from the run recorded in\n"
-            "results/results.csv on this repository.\n\n"
+            "STATUS: MEASURED. Numbers below come from runs recorded in results/\n"
+            "on this repository."
         )
         model_line = (
             f"solver model: {meta['solver_model']}, reviewer model: {meta['reviewer_model']}, "
             f"temperature 0, thinking disabled"
         )
-    table = table_md(stats)
-    none = stats.get("none", {})
-    rev = stats.get("reviewer", {})
-    gate = stats.get("gate", {})
-    selfc = stats.get("selfcheck", {})
-    rev_delta = (rev.get("pass_rate", 0) - none.get("pass_rate", 0)) * 100
-    gate_delta = (gate.get("pass_rate", 0) - none.get("pass_rate", 0)) * 100
-    selfc_delta = (selfc.get("pass_rate", 0) - none.get("pass_rate", 0)) * 100
     parts = []
     parts.append("# RESULTS\n")
-    parts.append(banner.rstrip())
-    parts.append(f"Run date: {date}. Tasks: {meta['n_tasks']} HumanEval problems "
-                 f"(first {meta['n_tasks']} by numeric task id). {model_line}.\n")
-    parts.append(table + "\n")
-    parts.append(f"Total tokens across the run: {int(total_tokens)}. Estimated cost: "
-                 f"{cost:.4f} USD (upper bound, glm-4.5 series list price 0.2/1.1 USD per "
+    parts.append(banner)
+    parts.append(f"Run date: {date}. {model_line}.\n")
+    parts.append(f"## {meta.get('title', 'Primary run')}\n")
+    parts.append(meta.get("note", "") + "\n")
+    parts.append(table_md(stats) + "\n")
+    for title, note, _xrows, xstats in extra_blocks or []:
+        parts.append(f"## {title}\n")
+        parts.append(note + "\n")
+        parts.append(table_md(xstats) + "\n")
+    parts.append(f"Total tokens across all measured runs above: {int(total_tokens)}. Estimated "
+                 f"cost: {cost:.4f} USD (upper bound, glm-4.5 series list price 0.2/1.1 USD per "
                  f"Mtok; the docs label glm-4.5-flash a free tier). Budget cap: 2 USD.\n")
     parts.append("## Does the direction match the paper\n")
+    # Use the last block whose none arm is below ceiling; deltas are meaningless at 100 percent.
+    cand = [stats] + [b[3] for b in (extra_blocks or [])]
+    usable = [s for s in cand if s.get("none", {}).get("pass_rate", 1.0) < 1.0] or [stats]
+    s = usable[-1]
+    none = s.get("none", {})
+    rev_delta = (s.get("reviewer", {}).get("pass_rate", 0) - none.get("pass_rate", 0)) * 100
+    gate_delta = (s.get("gate", {}).get("pass_rate", 0) - none.get("pass_rate", 0)) * 100
+    selfc_delta = (s.get("selfcheck", {}).get("pass_rate", 0) - none.get("pass_rate", 0)) * 100
     parts.append(
-        f"At this scale the reviewer arm changed the pass rate by {rev_delta:+.1f} points "
-        f"at {fmt(rev.get('cost_mult', 'n/a'))}x the token cost of the none arm, the gate arm "
-        f"by {gate_delta:+.1f} points at {fmt(gate.get('cost_mult', 'n/a'))}x, and the selfcheck "
-        f"arm by {selfc_delta:+.1f} points. The paper (arXiv 2610.34577) reports an independent "
-        f"reviewer adding 5.9 to 9.5 points at 1.13x to 1.25x cost and rejection gates adding "
-        f"about 6 points at 1.5x to 1.8x, and advises against completion-time self-checking. "
-        f"Whether these tiny-scale deltas agree in sign with those ranges is readable directly "
-        f"from the table above; with {meta['n_tasks']} tasks each task is 5 points, so any "
-        f"comparison is directional at best.\n"
+        f"On the subset with headroom below the ceiling, the reviewer arm changed the pass "
+        f"rate by {rev_delta:+.1f} points at {fmt(s.get('reviewer', {}).get('cost_mult', 'n/a'))}x "
+        f"the token cost of the none arm, the gate arm by {gate_delta:+.1f} points at "
+        f"{fmt(s.get('gate', {}).get('cost_mult', 'n/a'))}x, and the selfcheck arm by "
+        f"{selfc_delta:+.1f} points at {fmt(s.get('selfcheck', {}).get('cost_mult', 'n/a'))}x. "
+        f"The paper (arXiv 2610.34577) reports an independent reviewer adding 5.9 to 9.5 points "
+        f"at 1.13x to 1.25x cost and rejection gates adding about 6 points at 1.5x to 1.8x, "
+        f"and advises against completion-time self-checking. Each task here is 5 points, so "
+        f"these numbers carry the sign of the effect at best, not its size.\n"
     )
     parts.append("## Limitations\n")
     parts.append(
-        "- 20 HumanEval problems only: one flipped task moves the pass rate by 5 points.\n"
+        "- 20 HumanEval problems per subset: one flipped task moves a pass rate by 5 points.\n"
         "- One model (a flash tier), one temperature (0), one run per arm: no error bars.\n"
         "- HumanEval is function synthesis from docstrings, far easier and more self-contained "
         "than Terminal-Bench or SWE-bench Verified, where the paper located its findings.\n"
+        "- The first-20 subset saturates for this model, so verification deltas there are "
+        "structurally zero; the harder subset was selected after observing that saturation.\n"
         "- The gate arm sees the bundled tests, which rewards fitting those exact asserts.\n"
         "- Token counts proxy cost; the price conversion is an estimate, not an invoice.\n"
     )
